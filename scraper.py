@@ -7,6 +7,7 @@ def scraper(url, resp):
 
 def extract_next_links(url, resp):
     # Implementation requred.
+    print(url)
     return list()
 
 def is_valid(url):
@@ -25,5 +26,5 @@ def is_valid(url):
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
 
     except TypeError:
-        print ("TypeError for ", parsed)
+        print("TypeError for ", parsed)
         raise
