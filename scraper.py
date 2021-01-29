@@ -1,5 +1,5 @@
 import re
-import lxml
+from lxml import html
 from urllib.parse import urlparse
 from urllib.parse import urldefrag
 
@@ -12,7 +12,11 @@ def scraper(url, resp):
 
 
 def extract_next_links(url, resp):
-    # Implementation required.
+    if resp.status == 200:
+        data = html.document_fromstring(resp.raw_response.content)
+        return [link for element, attribute, link, pos in data.iterlinks()]
+    else:
+        print(f"{resp.status}:{resp.error}")
     return list()
 
 
