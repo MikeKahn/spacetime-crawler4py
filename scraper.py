@@ -2,8 +2,11 @@ import re
 from lxml import html
 from urllib.parse import urlparse
 from urllib.parse import urldefrag
+import datetime
 
 valid_domains = "ics.uci.edu|cs.uci.edu|informatics.uci.edu|stat.uci.edu"
+logging = True
+output = None
 
 
 def scraper(url, resp):
@@ -13,10 +16,14 @@ def scraper(url, resp):
 
 def extract_next_links(url, resp):
     if resp.status == 200:
+        log(f"{resp.status} - {url}\n")
+        # convert content into html data
         data = html.document_fromstring(resp.raw_response.content)
+        # TODO: check if page is worth crawling
+        # return all the links in the page
         return [link for element, attribute, link, pos in data.iterlinks()]
     else:
-        print(f"{resp.status}:{resp.error}")
+        log(f"{resp.status} - {url} - {resp.error}\n")
     return list()
 
 
@@ -42,3 +49,18 @@ def is_valid(url):
     except TypeError:
         print("TypeError for ", parsed)
         raise
+
+
+# outputs message to a log file
+def log(message):
+    # if logging disabled, do not output anything
+    if not logging:
+        return
+    global output
+    # open log file if not already open
+    if not output:
+        output = open(f"data/{datetime.datetime.now()}.txt", "w")
+    # write message to file
+    output.write(message)
+    # flush file to save output
+    output.flush()
