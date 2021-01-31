@@ -8,27 +8,37 @@ from urllib.parse import parse_qs
 import datetime
 import os
 
-valid_domains = "ics.uci.edu|cs.uci.edu|informatics.uci.edu|stat.uci.edu"
+# domains that are valid to crawl
+valid_domains = "ics.uci.edu|cs.uci.edu|informatics.uci.edu|stat.uci.edu|today.uci.edu/department" \
+                "/information_computer_sciences "
+# enable logging
 logging = True
+# output file
 output = None
-if not os.path.isdir('data'):
-    os.mkdir('data')
-
+# min text size of a page to analyze
+min_size = 0
+# max size of a page to analyze
+max_size = 1e9
+# min portion of a page that should be text
+min_part = 0.1
 
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
     urls = []
     for link in links:
-        # print(f"link:{link}")
+        # parse the url
         parsed = urlparse(link)
+        # separate the queries
         queries = parse_qs(parsed.query, keep_blank_values=False)
         # check if the link is a redirect to another url
         if "url" in queries:
             link = queries["url"][0]
         else:
+            # remove queries
             link = urljoin(link, parsed.path)
         if is_valid(link):
+            # append the url with fragment removed
             urls.append(urldefrag(link)[0])
     return urls
 
@@ -74,7 +84,7 @@ def is_valid(url):
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
             return False
         # Check if a valid domain
-        return re.search(rf"({valid_domains})", parsed.netloc)
+        return re.search(rf"({valid_domains})", url)
     except TypeError:
         print("TypeError for ", parsed)
         raise
@@ -88,6 +98,10 @@ def log(message):
     global output
     # open log file if not already open
     if not output:
+        # ensure data folder exists
+        if not os.path.isdir('data'):
+            os.mkdir('data')
+            # open log file
         output = open(f"data/{datetime.datetime.now()}.txt", "w")
     # write message to file
     output.write(message)
