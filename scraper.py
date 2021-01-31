@@ -1,7 +1,10 @@
 import re
 from lxml import html
+from lxml.html.clean import Cleaner
 from urllib.parse import urlparse
 from urllib.parse import urldefrag
+from urllib.parse import urljoin
+from urllib.parse import parse_qs
 import datetime
 
 valid_domains = "ics.uci.edu|cs.uci.edu|informatics.uci.edu|stat.uci.edu"
@@ -11,15 +14,37 @@ output = None
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
-    return [urldefrag(link)[0] for link in links if is_valid(link)]
+    urls = []
+    for link in links:
+        # print(f"link:{link}")
+        parsed = urlparse(link)
+        queries = parse_qs(parsed.query, keep_blank_values=False)
+        # check if the link is a redirect to another url
+        if "url" in queries:
+            link = queries["url"][0]
+        else:
+            link = urljoin(link, parsed.path)
+        if is_valid(link):
+            urls.append(urldefrag(link))
+    return urls
 
 
 def extract_next_links(url, resp):
     if resp.status == 200:
-        log(f"{resp.status} - {url}\n")
+        # log(f"{resp.status} - {url}\n")
+        # get total size of page
+        page_size = len(resp.raw_response.content)
+        # initialize text size
+        text_size = 0
         # convert content into html data
-        data = html.document_fromstring(resp.raw_response.content)
-        # TODO: check if page is worth crawling
+        parser = html.HTMLParser(remove_blank_text=True)
+        data = html.document_fromstring(resp.raw_response.content, parser)
+        # clean the document
+        cleaner = Cleaner(style=True)
+        cleaned = cleaner.clean_html(data)
+        text = cleaned.text_content()
+        text_size = len(text)
+        log(f"{resp.status} - {url} - {text_size}/{page_size}\n")
         # return all the links in the page
         return [link for element, attribute, link, pos in data.iterlinks()]
     else:
@@ -40,8 +65,8 @@ def is_valid(url):
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-            + r"|epub|dll|cnf|tgz|sha1"
-            + r"|thmx|mso|arff|rtf|jar|csv"
+            + r"|epub|dll|cnf|tgz|sha1|php"
+            + r"|thmx|mso|arff|rtf|jar|csv|xml"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
             return False
         # Check if a valid domain
