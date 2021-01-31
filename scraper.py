@@ -10,10 +10,41 @@ import datetime
 valid_domains = "ics.uci.edu|cs.uci.edu|informatics.uci.edu|stat.uci.edu"
 logging = True
 output = None
+# 
+# counter = 0
+# unique_pages = []
+# number_of_unique_pages = 0
+# subdomain_dic = {}
 
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
+    ####################################
+    # Get results for Q1 and Q4:
+    ####################################
+    # url_no_fragment = url.split('#')[0]
+    # if url_no_fragment not in unique_pages:
+    #     unique_pages.append(url_no_fragment)
+    #     # handle Q1 results
+    #     with open("unique_pages.txt", "a") as a_file:
+    #         a_file.write("\n")
+    #         a_file.write(url_no_fragment)
+    #     # handle Q4 results
+    #     o = urlparse(url_no_fragment)
+    #     current_page_domian = o.scheme + '://' + o.netloc
+
+        # if current_page_domian.endswith('.ics.uci.edu'):
+        #     if current_page_domian in subdomain_dic:
+        #         subdomain_dic[current_page_domian] += 1
+        #     else:
+        #         subdomain_dic[current_page_domian] = 1
+
+        # with open("subdomains.txt", "w") as a_file:
+        #     for key, val in subdomain_dic.items():
+        #         a_file.write("\n")
+        #         a_file.write(key+ ', ' + str(val))
+    ####################################
+    
     urls = []
     for link in links:
         # print(f"link:{link}")
@@ -25,7 +56,7 @@ def scraper(url, resp):
         else:
             link = urljoin(link, parsed.path)
         if is_valid(link):
-            urls.append(urldefrag(link))
+            urls.append(urldefrag(link)[0])
     return urls
 
 
@@ -42,6 +73,7 @@ def extract_next_links(url, resp):
         # clean the document
         cleaner = Cleaner(style=True)
         cleaned = cleaner.clean_html(data)
+        # this is text we need analysis
         text = cleaned.text_content()
         text_size = len(text)
         log(f"{resp.status} - {url} - {text_size}/{page_size}\n")
@@ -89,3 +121,5 @@ def log(message):
     output.write(message)
     # flush file to save output
     output.flush()
+
+# def tokenizeText:
