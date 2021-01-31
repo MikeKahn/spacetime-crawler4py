@@ -6,10 +6,14 @@ from urllib.parse import urldefrag
 from urllib.parse import urljoin
 from urllib.parse import parse_qs
 import datetime
+import os
 
 valid_domains = "ics.uci.edu|cs.uci.edu|informatics.uci.edu|stat.uci.edu"
 logging = True
 output = None
+if not os.path.isdir('data'):
+    os.mkdir('data')
+
 
 
 def scraper(url, resp):
@@ -25,7 +29,7 @@ def scraper(url, resp):
         else:
             link = urljoin(link, parsed.path)
         if is_valid(link):
-            urls.append(urldefrag(link))
+            urls.append(urldefrag(link)[0])
     return urls
 
 
