@@ -251,7 +251,7 @@ def calculate_subdomain(parsed, suffix):
         else:
             subdomain_dic[current_page_domain] = 1
     global sorted_domains
-    sorted_domains = sorted(subdomain_dic.items(), key=lambda item: item[0].lower(), reverse=True)
+    sorted_domains = sorted(subdomain_dic.items(), key=lambda item: item[0].lower())
 
 
 # writes all data needed for questions 1-4 into single file
