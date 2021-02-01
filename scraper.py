@@ -35,7 +35,7 @@ data_path = "data.txt"
 # separator string
 separator = "#" * 10 + "\n"
 # min text size of a page to analyze
-min_size = 0
+min_size = 1e3
 # max size of a page to analyze
 max_size = 1e6
 # min portion(%) of a page that should be text
@@ -97,6 +97,7 @@ def scraper(url, resp):
         if is_valid(link):
             # append the url with fragment removed
             urls.append(link)
+            print(link)
     return urls
 
 
@@ -115,6 +116,8 @@ def extract_next_links(url, resp):
         cleaned = cleaner.clean_html(data)
         text = cleaned.text_content()
         text_size = len(text)
+        # log the link
+        log(f"{resp.status} - {url} - {text_size}/{page_size}\n")
         # check if enough text content exists on page
         # if not skip analysis of this page
         if text_size < min_size or text_size / page_size < min_part:
@@ -125,7 +128,6 @@ def extract_next_links(url, resp):
         page_length(url, len(tk))
         # update the total frequencies of all words from all crawled pages
         word_frequencies(tk)
-        log(f"{resp.status} - {url} - {text_size}/{page_size}\n")
         write_data()
         # return all the links in the page
         return [link for element, attribute, link, pos in data.iterlinks()]
