@@ -64,17 +64,12 @@ lsh = MinHashLSH(threshold=0.75, num_perm=128)
 
 
 def scraper(url, resp):
-    # update unique count
-    global unique_count
-    unique_count += 1
-    # check sub-domain of the the url
-    p_url = urlparse(url)
-    calculate_subdomain(p_url, '.ics.uci.edu')
     links = extract_next_links(url, resp)
     # check if any links were returned
     if not links:
         return list()
     urls = []
+    p_url = urlparse(url)
     for link in links:
         # parse the url
         parsed = urlparse(link)
@@ -138,6 +133,12 @@ def extract_next_links(url, resp):
         page_length(url, len(tk))
         # update the total frequencies of all words from all crawled pages
         word_frequencies(tk)
+        # update unique count
+        global unique_count
+        unique_count += 1
+        # check sub-domain of the the url
+        p_url = urlparse(url)
+        calculate_subdomain(p_url, '.ics.uci.edu')
         write_data()
         # return all the links in the page
         return [link for element, attribute, link, pos in data.iterlinks()]
