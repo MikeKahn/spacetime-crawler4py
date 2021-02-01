@@ -2,7 +2,6 @@ import re
 from lxml import html
 from lxml.html.clean import Cleaner
 from urllib.parse import urlparse
-from urllib.parse import urldefrag
 from urllib.parse import urlunparse
 from urllib.parse import parse_qs
 import datetime
@@ -10,6 +9,7 @@ import os
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
+from datasketch import MinHash, LeanMinHash, MinHashLSH
 
 # you may need to download nltk data in order to make use of the nltk functionality
 nltk.download('stopwords')
@@ -26,6 +26,8 @@ invalid_types = "css|js|bmp|gif|jpe?g|ico" \
                 "|epub|dll|cnf|tgz|sha1|php" \
                 "|thmx|mso|arff|rtf|jar|csv|xml" \
                 "|rm|smil|wmv|swf|wma|zip|rar|gz"
+# invalid paths, these paths have often been found to be useless
+invalid_paths = "calender|wp-json"
 # enable logging
 logging = True
 # output file
@@ -57,6 +59,8 @@ sorted_domains = []
 count_url = 0
 # unique page count
 unique_count = 0
+# minhash index
+lsh = MinHashLSH(threshold=0.75, num_perm=128)
 
 
 def scraper(url, resp):
@@ -97,7 +101,6 @@ def scraper(url, resp):
         if is_valid(link):
             # append the url with fragment removed
             urls.append(link)
-            print(link)
     return urls
 
 
@@ -123,7 +126,14 @@ def extract_next_links(url, resp):
         if text_size < min_size or text_size / page_size < min_part:
             return []
         # tokenize the text on the page
-        tk = tokenize_words(url, text)
+        tk, lmh = tokenize_words(url, text)
+        # check if similar pages exist
+        global lsh
+        sim = lsh.query(lmh)
+        # if similar pages exist above threshold
+        if sim:
+            return list()
+        lsh.insert(url, lmh)
         # check if page length(token count) and compare with other pages
         page_length(url, len(tk))
         # update the total frequencies of all words from all crawled pages
@@ -152,7 +162,7 @@ def is_valid(url):
             if re.match(rf"^({invalid_types})$", part):
                 return False
             # skip calendar links as they have little information
-            elif part == "calendar":
+            elif re.match(rf"^({invalid_paths})$", part):
                 return False
         # Check if a valid domain
         return re.search(rf"({valid_domains})", url)
@@ -188,6 +198,7 @@ def tokenize_words(url, text):
     tokens = word_tokenize(words)
     # this is the list of valid tokens
     ftokens = []
+    mh = MinHash(num_perm=128)
     # iterates through full token list to filter out invalid tokens
     for t in tokens:
         # do not include the token if it is a stopword
@@ -197,7 +208,8 @@ def tokenize_words(url, text):
         if not re.match('[A-Za-z0-9]+', t):
             continue
         ftokens.append(t)
-    return ftokens
+        mh.update(t.encode("utf8"))
+    return ftokens, LeanMinHash(mh)
 
 
 # evaluates the page length of a url (# of valid tokens), updates to a dictionary that tracks page lengths for all urls
