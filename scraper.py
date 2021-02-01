@@ -24,33 +24,10 @@ def scraper(url, resp):
     else:
         url_no_fragment = url
     if url_no_fragment not in unique_pages:
-        # calulate the lines in "unique_pages.txt" for Q1
-        unique_pages.append(url_no_fragment)
         # handle Q1 results
-        writepath = "unique_pages.txt"
-        mode = 'a' if os.path.exists(writepath) else 'w'
-        with open(writepath, mode) as a_file:
-            if mode == 'w':
-                 a_file.write(url_no_fragment)
-            else:
-                a_file.write("\n")
-                a_file.write(url_no_fragment)
+        calculate_unique_page(url_no_fragment)
         # handle Q4 results
-        o = urlparse(url_no_fragment)
-        current_page_domian = o.scheme + '://' + o.netloc
-
-        if current_page_domian.endswith('.ics.uci.edu') and not current_page_domian.endswith('www.ics.uci.edu'):
-            if current_page_domian in subdomain_dic:
-                subdomain_dic[current_page_domian] += 1
-            else: 
-                subdomain_dic[current_page_domian] = 1
-
-        writepath2 = "question4.txt"
-
-        with open(writepath2, "w") as a_file:
-            for key, val in subdomain_dic.items():
-                a_file.write("\n")
-                a_file.write(key+ ', ' + str(val))
+        calculate_subdomain(url_no_fragment, '.ics.uci.edu', 'question4.txt')
     ####################################
 
     links = extract_next_links(url, resp)
@@ -129,3 +106,30 @@ def log(message):
     output.write(message)
     # flush file to save output
     output.flush()
+
+# calculate unique pages
+def calculate_unique_page(url_no_fragment):
+    # calulate the lines in "unique_pages.txt" for Q1
+    unique_pages.append(url_no_fragment)
+    writepath = "question1.txt"
+    with open(writepath, 'w') as a_file:
+        a_file.write('Number of unique URL: ' + str(len(unique_pages)))
+
+
+# calulate the subdomains For Question4
+def calculate_subdomain(url_no_fragment, suffix, output_file):
+    o = urlparse(url_no_fragment)
+    current_page_domian = o.scheme + '://' + o.netloc
+
+    if current_page_domian.endswith(suffix) and not current_page_domian.endswith('www.ics.uci.edu'):
+        if current_page_domian in subdomain_dic:
+            subdomain_dic[current_page_domian] += 1
+        else: 
+            subdomain_dic[current_page_domian] = 1
+
+    writepath2 = output_file
+
+    with open(writepath2, "w") as a_file:
+        for key, val in subdomain_dic.items():
+            a_file.write("\n")
+            a_file.write(key+ ', ' + str(val))
