@@ -3,7 +3,7 @@ from lxml import html
 from lxml.html.clean import Cleaner
 from urllib.parse import urlparse
 from urllib.parse import urldefrag
-from urllib.parse import urljoin
+from urllib.parse import urlunparse
 from urllib.parse import parse_qs
 import datetime
 import os
@@ -49,8 +49,6 @@ sorted_words = []
 # List of pages with largest token count
 pages_max = []
 max_len = -1
-# List of unique pages
-unique_pages = set()
 # dictionary of subdomains found
 subdomain_dic = {}
 # sorted list of sub-domains
@@ -66,7 +64,8 @@ def scraper(url, resp):
     global unique_count
     unique_count += 1
     # check sub-domain of the the url
-    calculate_subdomain(url, '.ics.uci.edu')
+    p_url = urlparse(url)
+    calculate_subdomain(p_url, '.ics.uci.edu')
     links = extract_next_links(url, resp)
     # check if any links were returned
     if not links:
@@ -79,13 +78,25 @@ def scraper(url, resp):
         queries = parse_qs(parsed.query, keep_blank_values=False)
         # check if the link is a redirect to another url
         if "url" in queries:
-            link = queries["url"][0]
-        else:
-            # remove queries
-            link = urljoin(link, parsed.path)
+            parsed = urlparse(queries["url"][0])
+        # set scheme if not one
+        scheme = parsed.scheme
+        if scheme == "":
+            scheme = p_url.scheme
+        # set netloc if not one
+        netloc = parsed.netloc
+        if netloc == "":
+            netloc = p_url.netloc
+        # set path to empty if just /
+        path = parsed.path
+        if re.match(r"^(/)+$", path):
+            path = ""
+        # reconstruct url
+        link = urlunparse((scheme, netloc, path, None, None, None))
+        # check if the link is valid
         if is_valid(link):
             # append the url with fragment removed
-            urls.append(urldefrag(link)[0])
+            urls.append(link)
     return urls
 
 
@@ -115,6 +126,7 @@ def extract_next_links(url, resp):
         # update the total frequencies of all words from all crawled pages
         word_frequencies(tk)
         log(f"{resp.status} - {url} - {text_size}/{page_size}\n")
+        write_data()
         # return all the links in the page
         return [link for element, attribute, link, pos in data.iterlinks()]
     else:
@@ -131,11 +143,14 @@ def is_valid(url):
         path = parsed.path.lower()
         # Check if not a web page
         if re.match(
-                rf".*\.({invalid_types})$", path):
+                rf".*\.({invalid_types})", path):
             return False
         # check if path contains file type
         for part in path.split("/"):
             if re.match(rf"^({invalid_types})$", part):
+                return False
+            # skip calendar links as they have little information
+            elif part == "calendar":
                 return False
         # Check if a valid domain
         return re.search(rf"({valid_domains})", url)
@@ -180,15 +195,6 @@ def tokenize_words(url, text):
         if not re.match('[A-Za-z0-9]+', t):
             continue
         ftokens.append(t)
-    # the commented code below is for recording the tokens and text from each page;
-    # not necessary for the assignment, but kept for reference
-    # global tokenFile
-    # if not tokenFile:
-    #    tokenFile = open("tokenFile.txt", "w")
-    # tokenFile.write(str(url) + ": " + str(ftokens) + "\n")
-    # tokenFile.write(str(url) + ": " + words + "\n")
-    # tokenFile.flush()
-    # write sorted file mapping URL's to page length (# of valid tokens)
     return ftokens
 
 
@@ -202,34 +208,8 @@ def page_length(url, length):
     if length == max_len:
         pages_max.append(url)
     else:
-        pages_max = list(url)
+        pages_max = [url]
         max_len = length
-    # call pageLen dict
-    # global pageLen
-    # creates dict if it does not exist yet, creates folder for word_data if it does not exist yet
-    # if not pageLen:
-    #    if not os.path.isdir('word_data'):
-    #        os.mkdir('word_data')
-    #    pageLen = {}
-    #    pageLen[url] = len(ftokens)
-    # else:
-    #    # only updates dict if current page length is greater than or equal to the longest page length found so far
-    #    longPage = max(pageLen, key=pageLen.get)
-    #    if len(ftokens) > pageLen[longPage]:
-    #        pageLen = {}
-    #        pageLen[url] = len(ftokens)
-    #    elif len(ftokens) == pageLen[longPage]:
-    #            pageLen[url] = len(ftokens)
-    #    else:
-    #        return len(ftokens)
-    # update pageLen dict
-    # pageLenFile = open("word_data/pageLengths.csv", 'w')
-    # for i in pageLen:
-    #    toWrite = i + "," + str(pageLen[i]) + "\n"
-    #    pageLenFile.write(toWrite)
-    # pageLenFile.close()
-    # return page length
-    # return len(ftokens)
 
 
 # updates word frequency dict with words from current page    
@@ -248,8 +228,7 @@ def word_frequencies(ftokens):
 
 
 # calculate the subdomains For Question4
-def calculate_subdomain(url, suffix):
-    parsed = urlparse(url)
+def calculate_subdomain(parsed, suffix):
     current_page_domain = parsed.netloc
     global subdomain_dic
     if current_page_domain.endswith(suffix) and not current_page_domain.endswith('www.ics.uci.edu'):
@@ -258,7 +237,7 @@ def calculate_subdomain(url, suffix):
         else:
             subdomain_dic[current_page_domain] = 1
     global sorted_domains
-    sorted_domains = sorted(subdomain_dic.keys(), key=lambda x: x.lower(), reverse=True)
+    sorted_domains = sorted(subdomain_dic.items(), key=lambda item: item[0].lower(), reverse=True)
 
 
 # writes all data needed for questions 1-4 into single file
@@ -266,21 +245,21 @@ def write_data():
     if os.path.exists(data_path):
         os.remove(data_path)
     with open(data_path, "w") as data_file:
-        # write count of unique pages (question 1)
-        data_file.write(f"unique: {count_url}\n")
-        data_file.write(separator)
+        # init lines with unique count
+        lines = [f"unique: {unique_count}\n", separator, "Longest Page(s)\n"]
         # write longest page(s) (question 2)
-        data_file.write("Longest Page(s)\n")
         for page in pages_max:
-            data_file.write(f"{page}, {max_len}\n")
-        data_file.write(separator)
+            lines.append(f"{page}, {max_len}\n")
+        lines.append(separator)
         # write top 50 words (question 3)
-        data_file.write("Most Common Words\n")
+        lines.append("Most Common Words\n")
         for word in sorted_words:
-            data_file.write(f"{word[0]}, {word[1]}\n")
-        data_file.write(separator)
+            lines.append(f"{word[0]}, {word[1]}\n")
+        lines.append(separator)
         # write unique sub-domains (question 4)
-        data_file.write("Unique Sub-Domains\n")
+        lines.append("Unique Sub-Domains\n")
         for domain in sorted_domains:
-            data_file.write(f"{domain[0]}, {domain[1]}\n")
-        data_file.write(separator)
+            lines.append(f"{domain[0]}, {domain[1]}\n")
+        lines.append(separator)
+        data_file.writelines(lines)
+        data_file.flush()
