@@ -93,7 +93,7 @@ def scraper(url, resp):
             netloc = p_url.netloc
         # set path to empty if just /
         path = parsed.path
-        if re.match(r"^(/)+$", path):
+        if not re.search(r"[a-zA-Z0-9]", path):
             path = ""
         # reconstruct url
         link = urlunparse((scheme, netloc, path, None, None, None))
@@ -161,7 +161,7 @@ def is_valid(url):
         for part in path.split("/"):
             if re.match(rf"^({invalid_types})$", part):
                 return False
-            # skip calendar links as they have little information
+            # skip links that we found have little information or lead to traps/loops
             elif re.match(rf"^({invalid_paths})$", part):
                 return False
         # Check if a valid domain
