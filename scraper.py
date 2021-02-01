@@ -15,6 +15,8 @@ output = None
 unique_pages = []
 subdomain_dic = {}
 
+count_url= 0
+
 def scraper(url, resp):
     ####################################
     # Get results for Q1 and Q4:
@@ -110,10 +112,15 @@ def log(message):
 # calculate unique pages
 def calculate_unique_page(url_no_fragment, output_file):
     # calulate the lines in "unique_pages.txt" for Q1
-    unique_pages.append(url_no_fragment)
+    global count_url
+    count_url += 1
+    # unique_pages.append(url_no_fragment)
     writepath = output_file
     with open(writepath, 'w') as a_file:
-        a_file.write('Number of unique URL: ' + str(len(unique_pages)))
+        # a_file.write('Number of unique URL: ' + str(len(unique_pages)))
+        # a_file.write('\n')
+        a_file.write('Number of unique URL: ' + str(count_url))
+
 
 
 # calulate the subdomains For Question4
@@ -127,10 +134,10 @@ def calculate_subdomain(url_no_fragment, suffix, output_file):
         else: 
             subdomain_dic[current_page_domian] = 1
 
-    sortednames=sorted(subdomain_dic.keys(), key=lambda x:x.lower())
+    sortedsubdomains=sorted(subdomain_dic.keys(), key=lambda x:x.lower())
 
     writepath2 = output_file
     with open(writepath2, "w") as a_file:
-        for path in sortednames:
+        for path in sortedsubdomains:
             a_file.write("\n")
             a_file.write(path + ', ' + str(subdomain_dic[path]))
