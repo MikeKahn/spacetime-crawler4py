@@ -25,7 +25,7 @@ def scraper(url, resp):
         url_no_fragment = url
     if url_no_fragment not in unique_pages:
         # handle Q1 results
-        calculate_unique_page(url_no_fragment)
+        calculate_unique_page(url_no_fragment, 'question1.txt')
         # handle Q4 results
         calculate_subdomain(url_no_fragment, '.ics.uci.edu', 'question4.txt')
     ####################################
@@ -108,10 +108,10 @@ def log(message):
     output.flush()
 
 # calculate unique pages
-def calculate_unique_page(url_no_fragment):
+def calculate_unique_page(url_no_fragment, output_file):
     # calulate the lines in "unique_pages.txt" for Q1
     unique_pages.append(url_no_fragment)
-    writepath = "question1.txt"
+    writepath = output_file
     with open(writepath, 'w') as a_file:
         a_file.write('Number of unique URL: ' + str(len(unique_pages)))
 
