@@ -160,6 +160,10 @@ def is_valid(url):
             return False
         # check if path contains file type
         for part in path.split("/"):
+            # check if invalid characters are in path
+            if re.search(r"^[^a-zA-Z0-9_\-.~]", part):
+                return False
+            # check if the path contains a file type that is invalid
             if re.match(rf"^({invalid_types})$", part):
                 return False
             # skip links that we found have little information or lead to traps/loops
