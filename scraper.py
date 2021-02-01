@@ -11,14 +11,22 @@ import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import operator
-from operator import itemgetter
 
 # you may need to download nltk data in order to make use of the nltk functionality
 nltk.download('stopwords')
 
 # domains that are valid to crawl
 valid_domains = "ics.uci.edu|cs.uci.edu|informatics.uci.edu|stat.uci.edu|today.uci.edu/department" \
-                "/information_computer_sciences "
+                "/information_computer_sciences"
+# invalid file types which should be skipped
+invalid_types = "css|js|bmp|gif|jpe?g|ico" \
+                "|png|tiff?|mid|mp2|mp3|mp4" \
+                "|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf" \
+                "|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names" \
+                "|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso" \
+                "|epub|dll|cnf|tgz|sha1|php" \
+                "|thmx|mso|arff|rtf|jar|csv|xml" \
+                "|rm|smil|wmv|swf|wma|zip|rar|gz"
 # enable logging
 logging = True
 # output file
@@ -26,35 +34,32 @@ output = None
 # min text size of a page to analyze
 min_size = 0
 # max size of a page to analyze
-max_size = 1e9
-# min portion of a page that should be text
+max_size = 1e6
+# min portion(%) of a page that should be text
 min_part = 0.1
 # used to get list of tokens in a page, commented out for now
-#tokenFile = None
+# tokenFile = None
 # dict mapping all tokens to total frequency 
 wordFreq = None
 # dict mapping all pages to page length (# of filtered tokens)
 pageLen = None
 # List of unique pages
-unique_pages = []
+unique_pages = set()
 # dictionary of subdomains found
 subdomain_dic = {}
+# count of unique pages
+count_url = 0
 
-count_url= 0
 
 def scraper(url, resp):
     ####################################
     # Get results for Q1 and Q4:
     ####################################
-    if '#' in url:
-        url_no_fragment = url.split('#')[0]
-    else:
-        url_no_fragment = url
-    if url_no_fragment not in unique_pages:
+    if url not in unique_pages:
         # handle Q1 results
-        calculate_unique_page(url_no_fragment, 'question1.txt')
+        calculate_unique_page(url, 'question1.txt')
         # handle Q4 results
-        calculate_subdomain(url_no_fragment, '.ics.uci.edu', 'question4.txt')
+        calculate_subdomain(url, '.ics.uci.edu', 'question4.txt')
     ####################################
 
     links = extract_next_links(url, resp)
@@ -78,11 +83,11 @@ def scraper(url, resp):
 
 def extract_next_links(url, resp):
     if resp.status == 200:
-        # log(f"{resp.status} - {url}\n")
         # get total size of page
         page_size = len(resp.raw_response.content)
-        # initialize text size
-        text_size = 0
+        # check to see if page is to large, if so skip it
+        if page_size > max_size:
+            return []
         # convert content into html data
         parser = html.HTMLParser(remove_blank_text=True)
         data = html.document_fromstring(resp.raw_response.content, parser)
@@ -90,13 +95,17 @@ def extract_next_links(url, resp):
         cleaner = Cleaner(style=True)
         cleaned = cleaner.clean_html(data)
         text = cleaned.text_content()
+        text_size = len(text)
+        # check if enough text content exists on page
+        # if not skip analysis of this page
+        if text_size < min_size or text_size / page_size < min_part:
+            return []
         # tokenize the text on the page
         tk = tokenize_words(url, text)
         # calculate length of the page (# of filtered tokens)
         tk_page_len = page_length(url, tk)
         # update the total frequencies of all words from all crawled pages
         word_frequencies(tk)
-        text_size = len(text)
         log(f"{resp.status} - {url} - {text_size}/{page_size}\n")
         # return all the links in the page
         return [link for element, attribute, link, pos in data.iterlinks()]
@@ -111,17 +120,15 @@ def is_valid(url):
         # Check if valid http/https link
         if parsed.scheme not in set(["http", "https"]):
             return False
+        path = parsed.path.lower()
         # Check if not a web page
         if re.match(
-            r".*\.(css|js|bmp|gif|jpe?g|ico"
-            + r"|png|tiff?|mid|mp2|mp3|mp4"
-            + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
-            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
-            + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-            + r"|epub|dll|cnf|tgz|sha1|php"
-            + r"|thmx|mso|arff|rtf|jar|csv|xml"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
+                rf".*\.({invalid_types})$", path):
             return False
+        # check if path contains file type
+        for part in path.split("/"):
+            if re.match(rf"^({invalid_types})$", part):
+                return False
         # Check if a valid domain
         return re.search(rf"({valid_domains})", url)
     except TypeError:
@@ -165,15 +172,17 @@ def tokenize_words(url, text):
         if not re.match('[A-Za-z0-9]+', t):
             continue
         ftokens.append(t)
-    # the commented code below is for recording the tokens and text from each page; not necessary for the assignment, but kept for reference
-    #global tokenFile
-    #if not tokenFile:
+    # the commented code below is for recording the tokens and text from each page;
+    # not necessary for the assignment, but kept for reference
+    # global tokenFile
+    # if not tokenFile:
     #    tokenFile = open("tokenFile.txt", "w")
-    #tokenFile.write(str(url) + ": " + str(ftokens) + "\n")
-    #tokenFile.write(str(url) + ": " + words + "\n")
-    #tokenFile.flush()
+    # tokenFile.write(str(url) + ": " + str(ftokens) + "\n")
+    # tokenFile.write(str(url) + ": " + words + "\n")
+    # tokenFile.flush()
     # write sorted file mapping URL's to page length (# of valid tokens)
     return ftokens
+
 
 # evaluates the page length of a url (# of valid tokens), updates to a dictionary that tracks page lengths for all urls
 # also returns the page lenth    
@@ -204,6 +213,7 @@ def page_length(url, ftokens):
     pageLenFile.close()
     # return page length
     return len(ftokens)
+
 
 # updates word frequency dict with words from current page    
 def word_frequencies(ftokens):
@@ -244,8 +254,7 @@ def calculate_unique_page(url_no_fragment, output_file):
         a_file.write('Number of unique URL: ' + str(count_url))
 
 
-
-# calulate the subdomains For Question4
+# calculate the subdomains For Question4
 def calculate_subdomain(url_no_fragment, suffix, output_file):
     o = urlparse(url_no_fragment)
     current_page_domian = o.scheme + '://' + o.netloc
@@ -262,5 +271,4 @@ def calculate_subdomain(url_no_fragment, suffix, output_file):
     with open(writepath2, "w") as a_file:
         for path in sortedsubdomains:
             a_file.write("\n")
-            a_file.write(path + ', ' + str(subdomain_dic[path])
-                         
+            a_file.write(path + ', ' + str(subdomain_dic[path]))
