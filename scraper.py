@@ -165,18 +165,23 @@ def page_length(url, ftokens):
         if not os.path.isdir('word_data'):
             os.mkdir('word_data')
         pageLen = {}
+        pageLen[url] = len(ftokens)
+    else:
+        # only updates dict if current page length is greater than or equal to the longest page length found so far
+        longPage = max(pageLen, key=pageLen.get)
+        if len(ftokens) > pageLen[longPage]:
+            pageLen = {}
+            pageLen[url] = len(ftokens)
+        elif len(ftokens) == pageLen[longPage]:
+                pageLen[url] = len(ftokens)
+        else:
+            return len(ftokens)
     # update pageLen dict
-    pageLen[url] = len(ftokens)
-    # sort pageLen dict (longest pages first)
-    pageLenR = dict(sorted(pageLen.items(), key=operator.itemgetter(1), reverse=True))
-    # write dict to file
     pageLenFile = open("word_data/pageLengths.csv", 'w')
-    for i in pageLenR:
-        toWrite = i + "," + str(pageLenR[i]) + "\n"
+    for i in pageLen:
+        toWrite = i + "," + str(pageLen[i]) + "\n"
         pageLenFile.write(toWrite)
     pageLenFile.close()
-    # update dict to sorted dict
-    pageLen = pageLenR
     # return page length
     return len(ftokens)
 
