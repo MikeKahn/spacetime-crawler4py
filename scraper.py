@@ -127,9 +127,10 @@ def calculate_subdomain(url_no_fragment, suffix, output_file):
         else: 
             subdomain_dic[current_page_domian] = 1
 
-    writepath2 = output_file
+    sortednames=sorted(subdomain_dic.keys(), key=lambda x:x.lower())
 
+    writepath2 = output_file
     with open(writepath2, "w") as a_file:
-        for key, val in subdomain_dic.items():
+        for path in sortednames:
             a_file.write("\n")
-            a_file.write(key+ ', ' + str(val))
+            a_file.write(path + ', ' + str(subdomain_dic[path]))
