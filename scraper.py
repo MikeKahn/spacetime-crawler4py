@@ -21,9 +21,28 @@ min_size = 0
 max_size = 1e9
 # min portion of a page that should be text
 min_part = 0.1
+# List of unique pages
+unique_pages = []
+# dictionary of subdomains found
+subdomain_dic = {}
 
+count_url= 0
 
 def scraper(url, resp):
+    ####################################
+    # Get results for Q1 and Q4:
+    ####################################
+    if '#' in url:
+        url_no_fragment = url.split('#')[0]
+    else:
+        url_no_fragment = url
+    if url_no_fragment not in unique_pages:
+        # handle Q1 results
+        calculate_unique_page(url_no_fragment, 'question1.txt')
+        # handle Q4 results
+        calculate_subdomain(url_no_fragment, '.ics.uci.edu', 'question4.txt')
+    ####################################
+
     links = extract_next_links(url, resp)
     urls = []
     for link in links:
@@ -107,3 +126,36 @@ def log(message):
     output.write(message)
     # flush file to save output
     output.flush()
+
+# calculate unique pages
+def calculate_unique_page(url_no_fragment, output_file):
+    # calulate the lines in "unique_pages.txt" for Q1
+    global count_url
+    count_url += 1
+    # unique_pages.append(url_no_fragment)
+    writepath = output_file
+    with open(writepath, 'w') as a_file:
+        # a_file.write('Number of unique URL: ' + str(len(unique_pages)))
+        # a_file.write('\n')
+        a_file.write('Number of unique URL: ' + str(count_url))
+
+
+
+# calulate the subdomains For Question4
+def calculate_subdomain(url_no_fragment, suffix, output_file):
+    o = urlparse(url_no_fragment)
+    current_page_domian = o.scheme + '://' + o.netloc
+
+    if current_page_domian.endswith(suffix) and not current_page_domian.endswith('www.ics.uci.edu'):
+        if current_page_domian in subdomain_dic:
+            subdomain_dic[current_page_domian] += 1
+        else:
+            subdomain_dic[current_page_domian] = 1
+
+    sortedsubdomains=sorted(subdomain_dic.keys(), key=lambda x:x.lower())
+
+    writepath2 = output_file
+    with open(writepath2, "w") as a_file:
+        for path in sortedsubdomains:
+            a_file.write("\n")
+            a_file.write(path + ', ' + str(subdomain_dic[path]))
