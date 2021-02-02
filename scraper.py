@@ -1,10 +1,11 @@
 import re
+import pickle
+import json
 from lxml import html
 from lxml.etree import ParseError, ParserError
 from lxml.html.clean import Cleaner
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
-from urllib.parse import parse_qs
 import datetime
 import os
 import nltk
@@ -15,6 +16,12 @@ from datasketch import MinHash, LeanMinHash, MinHashLSH
 # you may need to download nltk data in order to make use of the nltk functionality
 nltk.download('stopwords')
 
+# whether the data has been initialized
+initialized = False
+# after how many links to output data
+out_cycle = 10
+# current link count
+out_current = 0
 # domains that are valid to crawl
 valid_domains = "ics.uci.edu|cs.uci.edu|informatics.uci.edu|stat.uci.edu|today.uci.edu/department" \
                 "/information_computer_sciences"
@@ -34,7 +41,13 @@ logging = True
 # output file
 output = None
 # data file name
-data_path = "data.txt"
+data_path = "data.json"
+# tokens file name
+token_path = "tokens.pickle"
+# subdomain file name
+subdomain_path = "domains.pickle"
+# hashes file name
+hash_path = "hashes.pickle"
 # separator string
 separator = "#" * 10 + "\n"
 # min text size of a page to analyze
@@ -47,8 +60,6 @@ min_part = 0.1
 # tokenFile = None
 # dict mapping all tokens to total frequency 
 word_dict = {}
-# top 50 words by frequency
-sorted_words = []
 # List of pages with largest token count
 pages_max = []
 max_len = -1
@@ -56,8 +67,6 @@ max_len = -1
 subdomain_dic = {}
 # sorted list of sub-domains
 sorted_domains = []
-# count of unique pages
-count_url = 0
 # unique page count
 unique_count = 0
 # minhash index
@@ -65,6 +74,16 @@ lsh = MinHashLSH(threshold=0.75, num_perm=128)
 
 
 def scraper(url, resp):
+    global initialized
+    if not initialized:
+        init()
+        initialized = True
+    global out_current
+    if out_current == out_cycle:
+        write_data()
+        out_current = 0
+    else:
+        out_current += 1
     links = extract_next_links(url, resp)
     # check if any links were returned
     if not links:
@@ -74,11 +93,6 @@ def scraper(url, resp):
     for link in links:
         # parse the url
         parsed = urlparse(link)
-        # separate the queries
-        queries = parse_qs(parsed.query, keep_blank_values=False)
-        # check if the link is a redirect to another url
-        if "url" in queries:
-            parsed = urlparse(queries["url"][0])
         # set scheme if not one
         scheme = parsed.scheme
         if scheme == "":
@@ -87,12 +101,8 @@ def scraper(url, resp):
         netloc = parsed.netloc
         if netloc == "":
             netloc = p_url.netloc
-        # set path to empty if just /
-        path = parsed.path
-        if not re.search(r"[a-zA-Z0-9]", path):
-            path = ""
         # reconstruct url
-        link = urlunparse((scheme, netloc, path, None, None, None))
+        link = urlunparse((scheme, netloc, parsed.path, None, None, None))
         # check if the link is valid
         if is_valid(link):
             # append the url with fragment removed
@@ -143,7 +153,7 @@ def extract_next_links(url, resp):
         # check sub-domain of the the url
         p_url = urlparse(url)
         calculate_subdomain(p_url, '.ics.uci.edu')
-        write_data()
+        # write_data()
         # return all the links in the page
         return [link for element, attribute, link, pos in data.iterlinks()]
     else:
@@ -157,15 +167,22 @@ def is_valid(url):
         # Check if valid http/https link
         if parsed.scheme not in set(["http", "https"]):
             return False
+        # Check if a valid domain
+        if not re.search(rf"({valid_domains})", parsed.netloc):
+            return False
         path = parsed.path.lower()
         # Check if not a web page
-        if re.match(
-                rf".*\.({invalid_types})", path):
+        if re.match(rf".*\.({invalid_types})", path):
             return False
-        # check if path contains file type
+        # check if path contains file type or invalid characters
         for part in path.split("/"):
+            if part.strip() == "":
+                continue
             # check if invalid characters are in path
             if re.search(r"^[^a-zA-Z0-9_\-.~]", part):
+                return False
+            # check if at least one alphanumeric character
+            if not re.search(r"[a-zA-Z0-9]", part):
                 return False
             # check if the path contains a file type that is invalid
             if re.match(rf"^({invalid_types})$", part):
@@ -173,8 +190,7 @@ def is_valid(url):
             # skip links that we found have little information or lead to traps/loops
             elif re.match(rf"^({invalid_paths})$", part):
                 return False
-        # Check if a valid domain
-        return re.search(rf"({valid_domains})", url)
+        return True
     except TypeError:
         print("TypeError for ", parsed)
         raise
@@ -250,9 +266,6 @@ def word_frequencies(ftokens):
         if t not in word_dict:
             word_dict[t] = 0
         word_dict[t] += 1
-    # Get top 50 words
-    global sorted_words
-    sorted_words = sorted(word_dict.items(), key=lambda item: item[1], reverse=True)[:50]
 
 
 # calculate the subdomains For Question4
@@ -264,30 +277,53 @@ def calculate_subdomain(parsed, suffix):
             subdomain_dic[current_page_domain] += 1
         else:
             subdomain_dic[current_page_domain] = 1
-    global sorted_domains
-    sorted_domains = sorted(subdomain_dic.items(), key=lambda item: item[0].lower())
 
 
+# writes all data needed for continuing after program stopped
 # writes all data needed for questions 1-4 into single file
 def write_data():
-    if os.path.exists(data_path):
-        os.remove(data_path)
+    print("Writing data...")
+    # write backup data
+    with open(token_path, "wb") as token_file:
+        pickle.dump(word_dict, token_file, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(subdomain_path, "wb") as domain_file:
+        pickle.dump(subdomain_dic, domain_file, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(hash_path, "wb") as hash_file:
+        pickle.dump(lsh, hash_file, protocol=pickle.HIGHEST_PROTOCOL)
+    # write report data
+    data = {"unique": unique_count, "longest": max_len, "longest_pages": pages_max,
+            "common_words": sorted(word_dict.items(), key=lambda item: item[1], reverse=True)[:50],
+            "subdomains": sorted(subdomain_dic.items(), key=lambda item: item[0].lower())}
     with open(data_path, "w") as data_file:
-        # init lines with unique count
-        lines = [f"unique: {unique_count}\n", separator, "Longest Page(s)\n"]
-        # write longest page(s) (question 2)
-        for page in pages_max:
-            lines.append(f"{page}, {max_len}\n")
-        lines.append(separator)
-        # write top 50 words (question 3)
-        lines.append("Most Common Words\n")
-        for word in sorted_words:
-            lines.append(f"{word[0]}, {word[1]}\n")
-        lines.append(separator)
-        # write unique sub-domains (question 4)
-        lines.append("Unique Sub-Domains\n")
-        for domain in sorted_domains:
-            lines.append(f"{domain[0]}, {domain[1]}\n")
-        lines.append(separator)
-        data_file.writelines(lines)
-        data_file.flush()
+        json.dump(data,data_file, indent=4)
+    print("Data written.")
+
+
+# initializes data using existing data sets
+def init():
+    # get unique page count and longest page(s)
+    if os.path.exists(data_path):
+        with open(data_path, "r") as data_file:
+            global unique_count
+            global max_len
+            global pages_max
+            data = json.load(data_file)
+            unique_count = int(data["unique"])
+            max_len = int(data["longest"])
+            pages_max = data["longest_pages"]
+    # get token counts
+    if os.path.exists(token_path):
+        with open(token_path, "rb") as token_file:
+            global word_dict
+            word_dict = pickle.load(token_file)
+    # get sub-domain counts
+    if os.path.exists(subdomain_path):
+        with open(subdomain_path, "rb") as domain_file:
+            global subdomain_dic
+            subdomain_dic = pickle.load(domain_file)
+    # get minhash data
+    if os.path.exists(hash_path):
+        with open(hash_path, "rb") as hash_file:
+            global lsh
+            lsh = pickle.load(hash_file)
+    print("Data initialized")
