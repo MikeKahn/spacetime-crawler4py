@@ -216,8 +216,13 @@ def tokenize_words(url, text):
         # do not include the token if there are no alphanumeric characters
         if not re.match('[A-Za-z0-9]+', t):
             continue
-        ftokens.append(t)
-        mh.update(t.encode("utf8"))
+        # remove any non-alphanumeric characters from the token
+        t2 = re.sub('[^A-Za-z0-9]+', '', t).strip()
+        # skip the token if it is an empty string
+        if len(t2) <= 0:
+            continue
+        ftokens.append(t2)
+        mh.update(t2.encode("utf8"))
     return ftokens, LeanMinHash(mh)
 
 
