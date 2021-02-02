@@ -1,5 +1,6 @@
 import re
 from lxml import html
+from lxml.etree import ParseError, ParserError
 from lxml.html.clean import Cleaner
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
@@ -39,7 +40,7 @@ separator = "#" * 10 + "\n"
 # min text size of a page to analyze
 min_size = 1e3
 # max size of a page to analyze
-max_size = 1e6
+max_size = 2e5
 # min portion(%) of a page that should be text
 min_part = 0.1
 # used to get list of tokens in a page, commented out for now
@@ -108,7 +109,10 @@ def extract_next_links(url, resp):
             return []
         # convert content into html data
         parser = html.HTMLParser(remove_blank_text=True)
-        data = html.document_fromstring(resp.raw_response.content, parser)
+        try:
+            data = html.document_fromstring(resp.raw_response.content, parser)
+        except (ParseError, ParserError):
+            return list()
         # clean the document
         cleaner = Cleaner(style=True)
         cleaned = cleaner.clean_html(data)
