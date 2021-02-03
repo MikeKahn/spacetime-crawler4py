@@ -32,7 +32,7 @@ invalid_types = "css|js|bmp|gif|jpe?g|ico" \
                 "|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names" \
                 "|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso" \
                 "|epub|dll|cnf|tgz|sha1|php" \
-                "|thmx|mso|arff|rtf|jar|csv|xml" \
+                "|thmx|mso|arff|rtf|jar|csv|xml|svg" \
                 "|rm|smil|wmv|swf|wma|zip|rar|gz"
 # invalid paths, these paths have often been found to be useless
 invalid_paths = "calender|wp-json"
@@ -121,12 +121,12 @@ def extract_next_links(url, resp):
         parser = html.HTMLParser(remove_blank_text=True)
         try:
             data = html.document_fromstring(resp.raw_response.content, parser)
-        except (ParseError, ParserError):
+            # clean the document
+            cleaner = Cleaner(style=True)
+            cleaned = cleaner.clean_html(data)
+            text = cleaned.text_content()
+        except (ParseError, ParserError, UnicodeDecodeError):
             return list()
-        # clean the document
-        cleaner = Cleaner(style=True)
-        cleaned = cleaner.clean_html(data)
-        text = cleaned.text_content()
         text_size = len(text)
         # log the link
         log(f"{resp.status} - {url} - {text_size}/{page_size}\n")

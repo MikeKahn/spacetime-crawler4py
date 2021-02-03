@@ -110,9 +110,8 @@ venv.bak/
 *.shelve
 
 # log files
-/data/*
+# /data/*
 .idea/*
 .DS_Store
 frontier.shelve.db
 *.pickle
-*.txt
