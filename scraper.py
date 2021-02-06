@@ -1,6 +1,7 @@
 import re
 import pickle
 import json
+# Import lxml library for html page analysis
 from lxml import html
 from lxml.etree import ParseError, ParserError
 from lxml.html.clean import Cleaner
@@ -8,9 +9,11 @@ from urllib.parse import urlparse
 from urllib.parse import urlunparse
 import datetime
 import os
+# Import nltk library for tokenizing
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
+# Import datasketch for minhash calculation and index
 from datasketch import MinHash, LeanMinHash, MinHashLSH
 
 # you may need to download nltk data in order to make use of the nltk functionality
@@ -74,22 +77,29 @@ lsh = MinHashLSH(threshold=0.75, num_perm=128)
 
 
 def scraper(url, resp):
+    # check if initialized
+    # this is used to load data if not --restart
     global initialized
     if not initialized:
         init()
         initialized = True
+    # check out_counter
+    # output written data ever set amount of cycles
     global out_current
     if out_current == out_cycle:
         write_data()
         out_current = 0
     else:
         out_current += 1
+    # extract links from given url
     links = extract_next_links(url, resp)
     # check if any links were returned
     if not links:
         return list()
     urls = []
     p_url = urlparse(url)
+    # check if each link is valid
+    # modifies some links to make them valid
     for link in links:
         # parse the url
         parsed = urlparse(link)
